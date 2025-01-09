@@ -33,6 +33,8 @@ TEKTON_ANNOTATIONS_TO_CAPTURE = [
     ("results.tekton.dev/stored", "result_stored"),
 ]
 
+all_jsons = {}
+
 
 def setup_logger(stderr_log_lvl, log_file):
     """
@@ -371,6 +373,13 @@ def process_events_thread(watcher, data, lock):
                 data[e_name]["terminated"] = True
             else:
                 data[e_name]["terminated"] = False
+
+            # Capture latest update for an object
+            try:
+                uid = find("object.metadata.uid", event)
+                all_jsons[uid] = find("object", event)
+            except KeyError:
+                pass
 
 
 class PropagatingThread(threading.Thread):
@@ -810,6 +819,25 @@ def doit(args):
             {"pipelineruns": pipelineruns, "taskruns": taskruns},
             fd,
             cls=DateTimeEncoder,
+        )
+
+    with open("all_objects.json", 'w') as f:
+        logging.info("Captured object count: %d", len(all_jsons))
+        json.dump(
+            all_jsons,
+            f
+        )
+
+    all_tasks = []
+    for obj in all_jsons.values():
+        if obj['kind'] == 'TaskRun':
+            all_tasks.append(obj)
+
+    with open("all_tasks.json", 'w') as f:
+        logging.info("Captured object count: %d", len(all_tasks))
+        json.dump(
+            all_tasks,
+            f
         )
 
 
